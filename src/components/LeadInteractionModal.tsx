@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -35,32 +35,49 @@ export const LeadInteractionModal = ({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Initialize assistant's welcome message once modal is opened
   useEffect(() => {
     if (isOpen && lead?.name) {
       setMessages([
         {
-          id: "1",
+          id: "welcome",
           text: `Hi! I'm your AI assistant. I can help you follow up with ${lead.name}. What would you like to know?`,
           sender: "ai",
           timestamp: new Date(),
         },
       ]);
+    } else if (!isOpen) {
+      // Reset messages when modal closes
+      setMessages([]);
+      setInputMessage("");
+      setLoading(false);
+      // Cancel any ongoing requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
+      }
     }
-  }, [isOpen, lead]);
+  }, [isOpen, lead?.name]); // Added lead?.name to dependency array
 
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() || loading) return;
+
+    // Cancel any ongoing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
 
     const userMessage: ChatMessage = {
-      id: Date.now().toString(),
+      id: `user-${Date.now()}`,
       text: inputMessage,
       sender: "user",
       timestamp: new Date(),
     };
 
     setMessages((prev) => [...prev, userMessage]);
+    const currentInput = inputMessage; // Store current input
     setInputMessage("");
     setLoading(true);
 
@@ -77,12 +94,12 @@ Lead Info:
 - Date Added: ${new Date(lead.createdAt).toLocaleDateString()}
 
 User's Question:
-${inputMessage}
+${currentInput}
 
 DO NOT FORGET TO KEEP IT CONCISE AND SHORT
 `;
 
-    const aiMessageId = Date.now().toString();
+    const aiMessageId = `ai-${Date.now()}`;
     let streamedText = "";
 
     const newAIMessage: ChatMessage = {
@@ -94,6 +111,9 @@ DO NOT FORGET TO KEEP IT CONCISE AND SHORT
 
     setMessages((prev) => [...prev, newAIMessage]);
 
+    // Create new AbortController for this request
+    abortControllerRef.current = new AbortController();
+
     try {
       await streamChatGPT(fullPrompt, (chunk) => {
         streamedText += chunk;
@@ -104,15 +124,19 @@ DO NOT FORGET TO KEEP IT CONCISE AND SHORT
         );
       });
     } catch (err) {
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === aiMessageId
-            ? { ...msg, text: "⚠️ AI failed to respond. Please try again." }
-            : msg
-        )
-      );
+      // Only show error if it wasn't aborted
+      if (err instanceof Error && err.name !== 'AbortError') {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === aiMessageId
+              ? { ...msg, text: "⚠️ AI failed to respond. Please try again." }
+              : msg
+          )
+        );
+      }
     } finally {
       setLoading(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -123,18 +147,27 @@ DO NOT FORGET TO KEEP IT CONCISE AND SHORT
     }
   };
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl h-[80vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center justify-between">
             <span>AI Lead Assistant</span>
-            <div className="flex gap-2">
+            {/* <div className="flex gap-2">
               <Badge variant="outline">{lead.source}</Badge>
               <Badge variant={lead.status === "New" ? "default" : "secondary"}>
                 {lead.status}
               </Badge>
-            </div>
+            </div> */}
           </DialogTitle>
           <DialogDescription>
             Get AI-powered suggestions for interacting with {lead.name}

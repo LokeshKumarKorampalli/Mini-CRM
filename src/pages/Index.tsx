@@ -32,7 +32,7 @@ const Index = () => {
             <LeadCreationForm onLeadAdded={handleLeadAdded} />
             
             {/* Stats Cards */}
-            <div className="mt-6 grid grid-cols-2 gap-4">
+            {/* <div className="mt-6 grid grid-cols-2 gap-4">
               <div className="bg-card p-4 rounded-lg shadow-card border">
                 <div className="text-2xl font-bold text-primary">
                   {leads.length}
@@ -45,7 +45,7 @@ const Index = () => {
                 </div>
                 <div className="text-sm text-muted-foreground">Contacted</div>
               </div>
-            </div>
+            </div> */}
           </div>
 
           {/* Lead Dashboard Section */}

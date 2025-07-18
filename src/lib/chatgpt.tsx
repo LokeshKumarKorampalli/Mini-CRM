@@ -1,5 +1,5 @@
 export async function streamChatGPT(prompt: string, onDelta: (token: string) => void): Promise<void> {
-  const apiKey = "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"; // your OpenRouter key
+  const apiKey = "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"; // your OpenRouter key
 
 try {
     const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
